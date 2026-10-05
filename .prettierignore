@@ -1,0 +1,7 @@
+node_modules
+dist
+coverage
+.test-dist
+package-lock.json
+prisma/migrations
+ТЗ.md

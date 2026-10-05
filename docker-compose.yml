@@ -1,0 +1,46 @@
+name: developer-business-card
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-business_card}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-local_development_password}
+      POSTGRES_DB: ${POSTGRES_DB:-business_card}
+    ports:
+      - '127.0.0.1:${POSTGRES_PORT:-5433}:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        ['CMD-SHELL', 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+  app:
+    build: .
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-business_card}:${POSTGRES_PASSWORD:-local_development_password}@postgres:5432/${POSTGRES_DB:-business_card}?schema=public
+    ports:
+      - '127.0.0.1:${PORT:-3000}:3000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    init: true
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://localhost:3000/graphql', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({query: '{ __typename }'})}).then(async r => { const body = await r.json(); process.exit(r.ok && !body.errors ? 0 : 1); }).catch(() => process.exit(1))"
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 20s
+
+volumes:
+  postgres_data:

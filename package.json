@@ -1,0 +1,61 @@
+{
+  "name": "developer-business-card-api",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Учебная цифровая визитка разработчика на NestJS и GraphQL",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=22.22.3"
+  },
+  "scripts": {
+    "build": "prisma generate && nest build && npm run build:seed",
+    "build:seed": "tsc -p tsconfig.seed.json",
+    "start": "nest start",
+    "start:dev": "nest start --watch",
+    "start:prod": "node dist/main.js",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "npm run test:e2e",
+    "test:e2e": "npm run build && tsc -p tsconfig.test.json && node --test .test-dist/test/*.e2e-test.js",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:seed": "npm run build:seed && prisma db seed"
+  },
+  "prettier": {
+    "singleQuote": true,
+    "trailingComma": "all"
+  },
+  "dependencies": {
+    "@apollo/server": "5.5.1",
+    "@as-integrations/express5": "1.1.2",
+    "@nestjs/apollo": "14.0.3",
+    "@nestjs/common": "12.1.2",
+    "@nestjs/config": "12.0.1",
+    "@nestjs/core": "12.1.2",
+    "@nestjs/graphql": "14.0.3",
+    "@nestjs/platform-express": "12.1.2",
+    "@prisma/client": "6.19.3",
+    "dotenv": "18.0.5",
+    "graphql": "16.14.2",
+    "prisma": "6.19.3",
+    "reflect-metadata": "0.2.2",
+    "rxjs": "7.8.2"
+  },
+  "overrides": {
+    "deepmerge-ts": "8.0.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@nestjs/cli": "12.0.8",
+    "@nestjs/testing": "12.1.2",
+    "@types/node": "22.20.5",
+    "eslint": "10.12.0",
+    "eslint-config-prettier": "10.1.8",
+    "globals": "17.13.0",
+    "prettier": "3.9.9",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.71.1"
+  }
+}
