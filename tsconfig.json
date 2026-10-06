@@ -1,8 +1,8 @@
 {
   "compilerOptions": {
-    "module": "commonjs",
+    "module": "NodeNext",
     "target": "ES2022",
-    "moduleResolution": "node",
+    "moduleResolution": "NodeNext",
     "outDir": "./dist",
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
