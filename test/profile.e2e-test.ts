@@ -97,17 +97,32 @@ describe(
       const expectedProfile = {
         ...profile,
         skills: [...skills]
-          .sort((left, right) => left.name.localeCompare(right.name))
+          .sort((left, right) =>
+            Buffer.compare(Buffer.from(left.name), Buffer.from(right.name)),
+          )
           .map((skill) => ({ ...skill, profileId: profile.id })),
-        experience: experience.map((entry) => ({
-          ...entry,
-          startDate: entry.startDate.toISOString(),
-          profileId: profile.id,
-        })),
-        projects: projects.map((project) => ({
-          ...project,
-          profileId: profile.id,
-        })),
+        experience: [...experience]
+          .sort(
+            (left, right) =>
+              right.startDate.getTime() - left.startDate.getTime() ||
+              left.id.localeCompare(right.id),
+          )
+          .map((entry) => ({
+            ...entry,
+            startDate: entry.startDate.toISOString(),
+            endDate: entry.endDate?.toISOString() ?? null,
+            profileId: profile.id,
+          })),
+        projects: [...projects]
+          .sort(
+            (left, right) =>
+              left.name.localeCompare(right.name) ||
+              left.id.localeCompare(right.id),
+          )
+          .map((project) => ({
+            ...project,
+            profileId: profile.id,
+          })),
       };
       assert.deepEqual(await query(), { data: { profile: expectedProfile } });
     });
