@@ -6,11 +6,14 @@ import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
+import { profileData } from '../prisma/profile-data';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
+import { ProfileService } from '../src/profile/profile.service';
 
 describe('Profile GraphQL API', () => {
   const schemaName = `e2e_${randomUUID().replaceAll('-', '')}`;
+  let databaseUrl: URL;
   let app: INestApplication | undefined;
   let prisma: PrismaService | undefined;
   let endpoint: string;
@@ -21,19 +24,11 @@ describe('Profile GraphQL API', () => {
         process.env.DATABASE_URL,
         'Задайте DATABASE_URL в .env и запустите PostgreSQL.',
       );
-      const databaseUrl = new URL(process.env.DATABASE_URL);
+      databaseUrl = new URL(process.env.DATABASE_URL);
       databaseUrl.searchParams.set('schema', schemaName);
       prisma = new PrismaService({ datasourceUrl: databaseUrl.toString() });
 
-      execFileSync(
-        process.execPath,
-        [resolve('node_modules/prisma/build/index.js'), 'migrate', 'deploy'],
-        {
-          env: { ...process.env, DATABASE_URL: databaseUrl.toString() },
-          timeout: 60_000,
-          stdio: 'pipe',
-        },
-      );
+      runPrisma('migrate', 'deploy');
 
       await prisma.profile.create({
         data: {
@@ -94,6 +89,18 @@ describe('Profile GraphQL API', () => {
     }
   });
 
+  function runPrisma(...args: string[]): void {
+    execFileSync(
+      process.execPath,
+      [resolve('node_modules/prisma/build/index.js'), ...args],
+      {
+        env: { ...process.env, DATABASE_URL: databaseUrl.toString() },
+        timeout: 60_000,
+        stdio: 'pipe',
+      },
+    );
+  }
+
   async function query(source: string): Promise<unknown> {
     const response = await fetch(endpoint, {
       method: 'POST',
@@ -150,8 +157,36 @@ describe('Profile GraphQL API', () => {
     assert.match(await response.text(), /embeddable-sandbox/);
   });
 
+  it('повторный seed сохраняет данные и идентификаторы без дубликатов', async () => {
+    await prisma!.profile.deleteMany({ where: { id: profileData.id } });
+    const profileCount = await prisma!.profile.count();
+    const profileService = app!.get(ProfileService);
+
+    runPrisma('db', 'seed');
+    const initialProfile = await profileService.findProfile();
+    assert.ok(initialProfile);
+    assert.equal(initialProfile.name, profileData.name);
+
+    runPrisma('db', 'seed');
+    assert.deepEqual(await profileService.findProfile(), initialProfile);
+    assert.deepEqual(
+      await Promise.all([
+        prisma!.profile.count(),
+        prisma!.skill.count(),
+        prisma!.experience.count(),
+        prisma!.project.count(),
+      ]),
+      [
+        profileCount + 1,
+        profileData.skills.length,
+        profileData.experience.length,
+        profileData.projects.length,
+      ],
+    );
+  });
+
   it('возвращает null, если developer отсутствует, даже при наличии другого профиля', async () => {
-    await prisma!.profile.delete({ where: { id: 'developer' } });
+    await prisma!.profile.deleteMany({ where: { id: 'developer' } });
     assert.deepEqual(await query('{ profile { id } }'), {
       data: { profile: null },
     });
