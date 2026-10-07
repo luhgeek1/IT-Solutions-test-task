@@ -7,8 +7,8 @@ export class ProfileService {
   constructor(private readonly prisma: PrismaService) {}
 
   findProfile(): Promise<Profile | null> {
-    return this.prisma.profile.findFirst({
-      orderBy: { id: 'asc' },
+    return this.prisma.profile.findUnique({
+      where: { id: 'developer' },
       include: {
         skills: { orderBy: [{ name: 'asc' }, { id: 'asc' }] },
         experience: { orderBy: [{ startDate: 'desc' }, { id: 'asc' }] },

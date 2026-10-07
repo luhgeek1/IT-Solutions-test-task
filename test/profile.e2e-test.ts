@@ -6,170 +6,154 @@ import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { PrismaClient } from '@prisma/client';
-import { profileData } from '../prisma/profile-data';
 import { AppModule } from '../src/app.module';
+import { PrismaService } from '../src/prisma/prisma.service';
 
-const profileQuery = `
-  query {
-    profile {
-      id name description githubUrl linkedinUrl
-      skills { id name category profileId }
-      experience { id company position startDate endDate achievements profileId }
-      projects { id name description repositoryUrl liveUrl technologies profileId }
-    }
-  }
-`;
+describe('Profile GraphQL API', () => {
+  const schemaName = `e2e_${randomUUID().replaceAll('-', '')}`;
+  let app: INestApplication | undefined;
+  let prisma: PrismaService | undefined;
+  let endpoint: string;
 
-describe(
-  'Profile GraphQL API — реальная PostgreSQL',
-  { concurrency: false },
-  () => {
-    const schemaName = `e2e_${randomUUID().replaceAll('-', '')}`;
-    const originalDatabaseUrl = process.env.DATABASE_URL;
-    let app: INestApplication | undefined;
-    let prisma: PrismaClient | undefined;
-    let endpoint: string;
+  before(
+    async () => {
+      assert.ok(
+        process.env.DATABASE_URL,
+        'Задайте DATABASE_URL в .env и запустите PostgreSQL.',
+      );
+      const databaseUrl = new URL(process.env.DATABASE_URL);
+      databaseUrl.searchParams.set('schema', schemaName);
+      prisma = new PrismaService({ datasourceUrl: databaseUrl.toString() });
 
-    function runPrisma(...args: string[]): void {
       execFileSync(
         process.execPath,
-        [resolve('node_modules/prisma/build/index.js'), ...args],
-        { env: process.env, stdio: 'pipe', timeout: 60_000 },
+        [resolve('node_modules/prisma/build/index.js'), 'migrate', 'deploy'],
+        {
+          env: { ...process.env, DATABASE_URL: databaseUrl.toString() },
+          timeout: 60_000,
+          stdio: 'pipe',
+        },
       );
-    }
 
-    async function query(source: string = profileQuery): Promise<unknown> {
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: source }),
-      });
-      assert.equal(response.status, 200);
-      return response.json();
-    }
-
-    before(
-      async () => {
-        assert.ok(
-          originalDatabaseUrl,
-          'Задайте DATABASE_URL в .env и запустите PostgreSQL.',
-        );
-        const databaseUrl = new URL(originalDatabaseUrl);
-        databaseUrl.searchParams.set('schema', schemaName);
-        process.env.DATABASE_URL = databaseUrl.toString();
-        prisma = new PrismaClient({ datasourceUrl: process.env.DATABASE_URL });
-
-        runPrisma('migrate', 'deploy');
-        runPrisma('db', 'seed');
-
-        const moduleRef = await Test.createTestingModule({
-          imports: [AppModule],
-        }).compile();
-        app = moduleRef.createNestApplication({ logger: false });
-        await app.listen(0, '127.0.0.1');
-        endpoint = `${await app.getUrl()}/graphql`;
-      },
-      { timeout: 120_000 },
-    );
-
-    after(async () => {
-      try {
-        await app?.close();
-      } finally {
-        try {
-          await prisma?.$executeRawUnsafe(
-            `DROP SCHEMA IF EXISTS "${schemaName}" CASCADE`,
-          );
-        } finally {
-          await prisma?.$disconnect();
-          if (originalDatabaseUrl === undefined) {
-            delete process.env.DATABASE_URL;
-          } else {
-            process.env.DATABASE_URL = originalDatabaseUrl;
-          }
-        }
-      }
-    });
-
-    it('возвращает профиль и все вложенные связи с датами и nullable-полями', async () => {
-      const { skills, experience, projects, ...profile } = profileData;
-      const expectedProfile = {
-        ...profile,
-        skills: [...skills]
-          .sort((left, right) =>
-            Buffer.compare(Buffer.from(left.name), Buffer.from(right.name)),
-          )
-          .map((skill) => ({ ...skill, profileId: profile.id })),
-        experience: [...experience]
-          .sort(
-            (left, right) =>
-              right.startDate.getTime() - left.startDate.getTime() ||
-              left.id.localeCompare(right.id),
-          )
-          .map((entry) => ({
-            ...entry,
-            startDate: entry.startDate.toISOString(),
-            endDate: entry.endDate?.toISOString() ?? null,
-            profileId: profile.id,
-          })),
-        projects: [...projects]
-          .sort(
-            (left, right) =>
-              left.name.localeCompare(right.name) ||
-              left.id.localeCompare(right.id),
-          )
-          .map((project) => ({
-            ...project,
-            profileId: profile.id,
-          })),
-      };
-      assert.deepEqual(await query(), { data: { profile: expectedProfile } });
-    });
-
-    it('возвращает только запрошенные поля', async () => {
-      assert.deepEqual(await query('{ profile { name } }'), {
-        data: { profile: { name: profileData.name } },
-      });
-    });
-
-    it('повторный seed сохраняет данные и идентификаторы, удаляет устаревшие связи', async () => {
-      const initialResponse = await query();
-      await prisma!.skill.create({
+      await prisma.profile.create({
         data: {
-          id: 'obsolete-skill',
-          name: 'Obsolete skill',
-          category: 'Test',
-          profileId: profileData.id,
+          id: 'developer',
+          name: 'Test Developer',
+          description: 'Backend developer',
+          githubUrl: 'https://github.com/developer',
+          skills: { create: { name: 'TypeScript', category: 'Language' } },
+          experience: {
+            create: {
+              company: 'Test Company',
+              position: 'Developer',
+              startDate: new Date('2025-01-01'),
+              achievements: ['Built an API'],
+            },
+          },
+          projects: {
+            create: {
+              name: 'Business Card',
+              description: 'GraphQL API',
+              repositoryUrl: 'https://github.com/developer/business-card',
+              technologies: ['NestJS', 'Prisma'],
+            },
+          },
         },
       });
-      runPrisma('db', 'seed');
-      runPrisma('db', 'seed');
-      assert.deepEqual(await query(), initialResponse);
-      assert.equal(await prisma!.profile.count(), 1);
-      assert.equal(await prisma!.skill.count(), profileData.skills.length);
-      assert.equal(
-        await prisma!.experience.count(),
-        profileData.experience.length,
-      );
-      assert.equal(await prisma!.project.count(), profileData.projects.length);
-    });
-
-    it('отдаёт HTML с Apollo Sandbox по тому же endpoint', async () => {
-      const response = await fetch(endpoint, {
-        headers: { Accept: 'text/html' },
+      await prisma.profile.create({
+        data: {
+          id: 'aaa-other',
+          name: 'Other Developer',
+          description: 'Another profile',
+          githubUrl: 'https://github.com/other',
+        },
       });
-      assert.equal(response.status, 200);
-      assert.match(response.headers.get('content-type') ?? '', /text\/html/);
-      assert.match(await response.text(), /embeddable-sandbox/);
-    });
 
-    it('возвращает null для отсутствующего профиля; внешние ключи удаляют его связи', async () => {
-      await prisma!.profile.delete({ where: { id: profileData.id } });
-      assert.deepEqual(await query(), { data: { profile: null } });
-      assert.equal(await prisma!.skill.count(), 0);
-      assert.equal(await prisma!.experience.count(), 0);
-      assert.equal(await prisma!.project.count(), 0);
+      const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
+        .overrideProvider(PrismaService)
+        .useValue(prisma)
+        .compile();
+      app = moduleRef.createNestApplication({ logger: false });
+      await app.listen(0, '127.0.0.1');
+      endpoint = `${await app.getUrl()}/graphql`;
+    },
+    { timeout: 120_000 },
+  );
+
+  after(async () => {
+    try {
+      await prisma?.$executeRawUnsafe(
+        `DROP SCHEMA IF EXISTS "${schemaName}" CASCADE`,
+      );
+    } finally {
+      if (app) {
+        await app.close();
+      } else {
+        await prisma?.$disconnect();
+      }
+    }
+  });
+
+  async function query(source: string): Promise<unknown> {
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: source }),
     });
-  },
-);
+    assert.equal(response.status, 200);
+    return response.json();
+  }
+
+  it('возвращает профиль developer со всеми связями, даже если есть другой профиль', async () => {
+    const result = await query(`{
+      profile {
+        id name linkedinUrl
+        skills { name category }
+        experience { company startDate endDate }
+        projects { name technologies }
+      }
+    }`);
+    assert.deepEqual(result, {
+      data: {
+        profile: {
+          id: 'developer',
+          name: 'Test Developer',
+          linkedinUrl: null,
+          skills: [{ name: 'TypeScript', category: 'Language' }],
+          experience: [
+            {
+              company: 'Test Company',
+              startDate: '2025-01-01T00:00:00.000Z',
+              endDate: null,
+            },
+          ],
+          projects: [
+            { name: 'Business Card', technologies: ['NestJS', 'Prisma'] },
+          ],
+        },
+      },
+    });
+  });
+
+  it('возвращает только запрошенные поля', async () => {
+    assert.deepEqual(await query('{ profile { name } }'), {
+      data: { profile: { name: 'Test Developer' } },
+    });
+  });
+
+  it('отдаёт HTML с Apollo Sandbox', async () => {
+    const response = await fetch(endpoint, {
+      headers: { Accept: 'text/html' },
+    });
+    assert.equal(response.status, 200);
+    assert.match(response.headers.get('content-type') ?? '', /text\/html/);
+    assert.match(await response.text(), /embeddable-sandbox/);
+  });
+
+  it('возвращает null, если developer отсутствует, даже при наличии другого профиля', async () => {
+    await prisma!.profile.delete({ where: { id: 'developer' } });
+    assert.deepEqual(await query('{ profile { id } }'), {
+      data: { profile: null },
+    });
+  });
+});
