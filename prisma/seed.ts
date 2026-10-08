@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
-import { profileData } from './profile-data';
+import { profileData } from './profile-data.js';
 
 const prisma = new PrismaClient();
 

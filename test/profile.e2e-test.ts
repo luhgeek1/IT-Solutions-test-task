@@ -6,10 +6,10 @@ import { resolve } from 'node:path';
 import { after, before, describe, it } from 'node:test';
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import { profileData } from '../prisma/profile-data';
-import { AppModule } from '../src/app.module';
-import { PrismaService } from '../src/prisma/prisma.service';
-import { ProfileService } from '../src/profile/profile.service';
+import { profileData } from '../prisma/profile-data.js';
+import { AppModule } from '../src/app.module.js';
+import { PrismaService } from '../src/prisma/prisma.service.js';
+import { ProfileService } from '../src/profile/profile.service.js';
 
 describe('Profile GraphQL API', () => {
   const schemaName = `e2e_${randomUUID().replaceAll('-', '')}`;

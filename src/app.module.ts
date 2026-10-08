@@ -2,7 +2,7 @@ import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { GraphQLModule } from '@nestjs/graphql';
-import { ProfileModule } from './profile/profile.module';
+import { ProfileModule } from './profile/profile.module.js';
 
 @Module({
   imports: [

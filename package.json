@@ -2,6 +2,7 @@
   "name": "developer-business-card-api",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "description": "Учебная цифровая визитка разработчика на NestJS и GraphQL",
   "license": "UNLICENSED",
   "engines": {
