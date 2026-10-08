@@ -7,8 +7,9 @@ coverage/
 .env.*
 !.env.example
 *.tsbuildinfo
-.DS_Store
 *.log
+.DS_Store
 .idea/
 .vscode/
 /ТЗ.md
+/PROJECT_GUIDE.md

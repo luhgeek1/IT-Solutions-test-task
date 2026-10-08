@@ -5,10 +5,11 @@
   "description": "Учебная цифровая визитка разработчика на NestJS и GraphQL",
   "license": "UNLICENSED",
   "engines": {
-    "node": ">=22.22.3"
+    "node": ">=22.22.3 <23"
   },
   "scripts": {
     "build": "prisma generate && nest build && npm run build:seed",
+    "build:vercel": "npm run build && npm run db:deploy && prisma db seed",
     "build:seed": "tsc -p tsconfig.seed.json",
     "start": "nest start",
     "start:dev": "nest start --watch",

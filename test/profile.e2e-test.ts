@@ -94,7 +94,11 @@ describe('Profile GraphQL API', () => {
       process.execPath,
       [resolve('node_modules/prisma/build/index.js'), ...args],
       {
-        env: { ...process.env, DATABASE_URL: databaseUrl.toString() },
+        env: {
+          ...process.env,
+          DATABASE_URL: databaseUrl.toString(),
+          DATABASE_URL_UNPOOLED: databaseUrl.toString(),
+        },
         timeout: 60_000,
         stdio: 'pipe',
       },
